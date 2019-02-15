@@ -6,4 +6,4 @@ Host your webpage on either GitHub Pages, RPubs, or NeoCities.
 
 Your webpage must contain the date that you created the document, and it must contain a map created with Leaflet. We would love to see you show off your creativity!
 
-Web page in: http://rpubs.com/desareca/Earthquake-in-Chile
+Web page in: https://rpubs.com/desareca/Earthquake-Statistics-in-Chile
