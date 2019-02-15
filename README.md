@@ -13,6 +13,6 @@ This Specialization covers the concepts and tools you'll need throughout the ent
 - Regression Models
 - Practical Machine Learning
 - Developing Data Products
-- Data Science Capstone
+- Data Science Capstone (https://github.com/desareca/Data-Science-Capstone)
 
 
