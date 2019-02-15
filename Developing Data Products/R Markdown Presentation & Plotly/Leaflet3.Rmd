@@ -1,0 +1,36 @@
+---
+title: "Earthquake Statistics in Chile"
+author: "crsd"
+date: "November 20, 2018"
+output: ioslides_presentation
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+## *Earthquakes that occurred in Chile.*
+
+```{r echo=FALSE, message=FALSE}
+library(plotly)
+library(RColorBrewer)
+library(leaflet)
+library(lubridate)
+library(dplyr)
+library(png)
+quake<-read.csv("quake.csv")
+names(quake)[6] <- "Magnitude"
+names(quake)[2] <- "Date"
+names(quake)[5] <- "Depth"
+quake$Date <- as.factor(year(quake$Date))
+pal <- colorRampPalette(brewer.pal(8, "Dark2"))
+plot_ly(quake, y = ~Magnitude, color = ~Date, type = "box", colors = pal(14)) %>%
+layout(title = 'Earthquake Statistics in Chile per year')
+```
+
+## *Map of earthquakes in Chile between 2002 and 2015.*
+```{r echo=FALSE, message=FALSE, fig.cap="Map of earthquakes in Chile"}
+pop = paste(sep = "<br/>",paste("Magnitude (Richter Scale): ",as.character(quake$Magnitude)),paste("Depth (km):",as.character(quake$Depth)),paste("Date (Y-M-D) :",substr(quake$Date,1,10)))
+
+addMarkers(addTiles(leaflet(quake)),clusterOptions = markerClusterOptions(), popup = pop, icon = makeIcon(iconUrl = "earthquake-3.png"))
+```
