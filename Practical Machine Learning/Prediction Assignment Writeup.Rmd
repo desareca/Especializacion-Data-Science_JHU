@@ -1,0 +1,232 @@
+---
+title: "Prediction Assignment Writeup"
+author: "crsd"
+date: "December 13, 2018"
+output:
+      html_document:
+            code_folding: show
+            toc: true
+            toc_depth: 3
+            number_sections: false
+            theme: united
+            highlight: tango
+            css: air.css
+            keep_md: true
+            df_print: kable
+---
+# Introduction
+
+Research on the recognition of human activity has traditionally focused on discriminating between different activities. However, research on "how (well)" has received little attention so far, although it potentially provides useful information for a wide variety of applications, such as sports training http://groupware.les.inf.puc-rio.br/har.
+
+For the prediction of how the individuals performed the assigned exercise, six young health participants were asked to perform a series of 10 repetitions of unilateral dumbbell biceps flexion in five different ways: exactly according to the specification (**Class A**), throwing the elbows at the front (**Class B**), raise the dumbbell only halfway (**Class C**), lower the dumbbell only halfway (**Class D**) and throw the hips forward (**Class E**).
+
+The purpose of this report is to use machine learning algorithms to predict the kind of exercise that individuals were doing by using measurements available on devices such as Jawbone Up, Nike FuelBand and Fitbit.
+
+
+
+# Data cleaning
+## Loading data
+
+To begin we download the data. There are 2 data sets that are downloaded from the following links:
+
+-  **train set:** https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv
+- **test set:** https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv
+```{r lib, message=FALSE, warning=FALSE, comment="", cache=T}
+library(caret)
+library(corrplot)
+library(knitr)
+library(dplyr)
+library(tidyr)
+```
+```{r load, message=FALSE, warning=FALSE, comment="", cache=T}
+# TrainURL <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+# TestURL <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+# write.csv(read.csv(TrainURL), file = "train.csv")
+# write.csv(read.csv(TestURL), file = "test.csv")
+training <- read.csv("train.csv")
+test <- read.csv("test.csv")
+```
+```{r dim, message=FALSE, warning=FALSE, comment="", cache=T}
+dim(training) # dimensions of the train set
+dim(test) # dimensions of the test set
+```
+Now we proceed to the cleaning of the data. We check if there is **NA**, **NAN** or **empty** data. In case of finding, we will eliminate the variables that have more than 95% of their data as **NA**, **NAN** or **empty** data. The other cases in which these values are found are reviewed individually.
+In addition, variables that have variance that store to zero will be removed to eviatr that affects the design of the models.
+
+```{r clean, message=FALSE, warning=FALSE, comment="", cache=T}
+# Count how many NA there are in each variable and filter them if necessary
+CountNA <- data.frame(colSums(1*is.na(training)))
+CountNotNA <- data.frame(colSums(1*!is.na(training)))
+ratioNA <- t(100*(1 - CountNA/(CountNA + CountNotNA)))
+
+training <- training[,ratioNA > 5]
+test <- test[,ratioNA > 5]
+
+# Count how many # DIV / 0! and empty data in each variable and filters them if necessary
+valMiss <- ((training=="#DIV/0!") + (training==""))>=1
+CountMiss <- data.frame(colSums(1*valMiss))
+CountNotMiss <- data.frame(colSums(1*!valMiss))
+ratioMiss <- t(100*(1 - CountMiss/(CountMiss + CountNotMiss)))
+
+training <- training[,ratioMiss > 5]
+test <- test[,ratioMiss > 5]
+
+# Removes hyphens and dots in the names of the variables.
+names(training) <- gsub("_","",names(training))
+names(training)[1] <- "X1"
+names(test) <- gsub("_","",names(test))
+names(test)[1] <- "X1"
+training <- training[,-1]
+test <- test[,-1]
+
+# Eliminate variables with variance close to zero
+NZV <- nearZeroVar(training)
+training <- training[,-NZV]
+test <- test[,-NZV]
+
+# Eliminates variables that are not transcendent for prediction.
+training <- training[,-c(1:6)]
+test <- test[,-c(1:6)]
+dim(training) # dimensions of the training set
+dim(test) # dimensions of the test set
+```
+
+A correlation analysis is performed between the variables before the modeling work is done. Select "FPC" for the first principal component.
+
+```{r cor, message=FALSE, warning=FALSE, comment="", cache=T}
+corrplot(cor(training[,-53]), order = "FPC", method = "circle", type = "upper", tl.cex = 0.6, tl.col = rgb(0, 0, 0), title = "Figure 1 - Graphic correlation between variables", mar = c(0, 0, 5, 0))
+```
+
+If two variables are highly correlated, their colors are blue or red (for a positive or negative correlation).
+To further reduce the number of variables, a Principal Component Analysis (**PCA**) could be performed, however, since there are only very few strong correlations between the input variables, the **PCA** will not be performed. Instead, several different prediction models will be constructed below.
+
+
+# Prediction models
+
+## Split of training and test sets.
+
+For the training and testing set, a ratio of 70% of **training** and 30% of **test** is considered.
+
+```{r trainset, message=FALSE, warning=FALSE, comment="", cache=T}
+set.seed(28916022)
+Index1 <- createDataPartition(y = training$classe, p = 0.7,
+                              list = FALSE)
+testing <- training[-Index1,]
+training <- training[Index1,]
+table <- rbind(prop.table(table(training$classe)), 
+               prop.table(table(testing$classe)))
+rownames(table) <- c("training", "testing")
+round(table,3) # Proportion of the different levels in each data set
+```
+
+
+## Implementation of the model.
+### Training.
+4 models will be used to predict:
+
+- Linear Discriminant Analysis (**LDA**)
+- Quadratic Discriminant Analysis (**QDA**)
+- k-Nearest Neighbors (**KNN**)
+- Generalized Boosted Regression Modeling (**GBM**)
+
+In addition, a **5-fold (k-fold) cross-validation** is considered: the k-fold cross-validation method consists of dividing the data set into k-subsets. For each subset it is maintained while the model is trained in all other subsets. It is a robust method to estimate the accuracy, and the size of k and adjust the amount of bias in the estimate.
+
+```{r fit, message=FALSE, warning=FALSE, cache=T, comment="", echo=TRUE, eval=TRUE}
+trC=trainControl(method="cv", number=5)
+m="Accuracy"
+
+set.seed(2891)
+fitLDA <- train(classe~., data=training, method="lda", metric=m,
+                trControl=trC)
+set.seed(2891)
+fitQDA <- train(classe~., data=training, method="qda", metric=m,
+                trControl=trC) 
+set.seed(2891)
+fitGBM <- train(classe~., data=training, method="gbm", metric=m,
+                trControl=trC, verbose=FALSE) 
+set.seed(2891)
+fitKNN <- train(classe~., data=training, method="knn", metric=m,
+                trControl=trC)
+```
+
+### Testing.
+
+With the models already trained we proceed to make the test predictions and evaluate their performance.
+
+```{r Testing, message=FALSE, warning=FALSE, cache=T, comment="", echo=TRUE, eval=TRUE}
+PredLDAtrain<-predict(fitLDA, newdata=training)
+PredQDAtrain<-predict(fitQDA, newdata=training)
+PredKNNtrain<-predict(fitKNN, newdata=training)
+PredGBMtrain<-predict(fitGBM, newdata=training)
+PredLDAtest<-predict(fitLDA, newdata=testing)
+PredQDAtest<-predict(fitQDA, newdata=testing)
+PredKNNtest<-predict(fitKNN, newdata=testing)
+PredGBMtest<-predict(fitGBM, newdata=testing)
+
+mSummaryTrain <- cbind(confusionMatrix(PredLDAtrain, training$classe)$overall[1],
+                       confusionMatrix(PredQDAtrain, training$classe)$overall[1],
+                       confusionMatrix(PredKNNtrain, training$classe)$overall[1],
+                       confusionMatrix(PredGBMtrain, training$classe)$overall[1])
+colnames(mSummaryTrain) <- c("LDA", "QDA", "KNN", "GBM")
+rownames(mSummaryTrain) <- "Training"
+
+mSummaryTest <- cbind(confusionMatrix(PredLDAtest, testing$classe)$overall[1],
+                       confusionMatrix(PredQDAtest, testing$classe)$overall[1],
+                       confusionMatrix(PredKNNtest, testing$classe)$overall[1],
+                       confusionMatrix(PredGBMtest, testing$classe)$overall[1])
+colnames(mSummaryTest) <- c("LDA", "QDA", "KNN", "GBM")
+rownames(mSummaryTest) <- "Testing"
+
+# Confusion matrix of the fitLDA predictor and the test set
+confusionMatrix(PredLDAtest, testing$classe)
+
+# Confusion matrix of the fitQDA predictor and the test set
+confusionMatrix(PredQDAtest, testing$classe)
+
+# Confusion matrix of the fitKNN predictor and the test set
+confusionMatrix(PredKNNtest, testing$classe)
+
+# Confusion matrix of the fitGBM predictor and the test set
+confusionMatrix(PredGBMtest, testing$classe)
+
+# Comparing accuracy of the training and test set
+round(rbind(mSummaryTrain, mSummaryTest),3)
+
+# Comparing error of the training and test set
+## Error is considered as the sum of the cases in which the prediction differs from the reference,
+## divided among all the cases.
+
+errorLDAtrain <- sum(PredLDAtrain!=training$classe)/length(training$classe)
+errorQDAtrain <- sum(PredQDAtrain!=training$classe)/length(training$classe)
+errorKNNtrain <- sum(PredKNNtrain!=training$classe)/length(training$classe)
+errorGBMtrain <- sum(PredGBMtrain!=training$classe)/length(training$classe)
+
+errorLDAtest <- sum(PredLDAtest!=testing$classe)/length(testing$classe)
+errorQDAtest <- sum(PredQDAtest!=testing$classe)/length(testing$classe)
+errorKNNtest <- sum(PredKNNtest!=testing$classe)/length(testing$classe)
+errorGBMtest <- sum(PredGBMtest!=testing$classe)/length(testing$classe)
+
+mError <- rbind(cbind(errorLDAtrain,errorQDAtrain,errorKNNtrain,errorGBMtrain),
+                cbind(errorLDAtest,errorQDAtest,errorKNNtest,errorGBMtest))
+
+colnames(mError) <- c("LDA", "QDA", "KNN", "GBM")
+rownames(mError) <- c("Training","Testing")
+
+round(mError,3) # Error of the training and test set
+```
+
+It is observed that the predictions of the training set have a better precision than those of the test set. In the case of error, the opposite occurs, the error increases in the test set compared with the training set.
+
+In addition, we observe that the model with the best precision and the least error is GBM.
+
+## Testing set Test (pml-testing.csv)
+
+Now we select the GBM model to predict based on the data set "pml-testing.csv".
+
+```{r Test, message=FALSE, warning=FALSE, cache=T, comment="", echo=TRUE, eval=TRUE}
+PredictTest <- predict(fitGBM, newdata=test)
+
+filename = "Results_problem_id.txt"
+write.table(PredictTest,file=filename,quote=FALSE,row.names=FALSE,col.names=FALSE)
+
+```
