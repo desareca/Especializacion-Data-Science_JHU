@@ -1,0 +1,165 @@
+Reproducible Research: Course Project 2
+========================================================
+***C. Saquel***  
+***8 November 2018***
+
+
+## Sinopsys
+
+Storms and other severe weather events can cause public health and economic problems for communities and municipalities. Many serious events can cause deaths, injuries and property damage, and the prevention of such results as much as possible is a key concern.
+
+This project involves exploring the storm database of the National Oceanic and Atmospheric Administration of the United States (NOAA). This database tracks the characteristics of major storms and weather events in the United States, including when and where they occur, as well as estimates of deaths, injuries and property damage.
+
+The following are the most significant events with respect to the damage to the health of the population and the greatest economic consequences.
+
+
+## Data Processing
+
+The data corresponds to a database that contains climatic events that occurred in the United States between 1950 and the year 2011. You can download the file from the website:
+
+- [Storm Data](https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2)
+
+There is also some documentation of the database available. Here you will find how some of the variables are constructed/defined.:
+
+- [National Weather Service Storm Data Documentation](https://d396qusza40orc.cloudfront.net/repdata%2Fpeer2_doc%2Fpd01016005curr.pdf)
+- [National Climatic Data Center Storm Events FAQ](https://d396qusza40orc.cloudfront.net/repdata%2Fpeer2_doc%2FNCDC%20Storm%20Events-FAQ%20Page.pdf)
+
+```{r, echo=TRUE, message=FALSE, warning=FALSE, cache=TRUE}
+url <- "https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2"
+folder <- "C:/Users/HP/Documents/Data Science/Reproducible Research/Week 4/Project"
+setwd(folder)
+download.file(url, "StormData.csv.bz2")
+StormData <- read.csv("StormData.csv.bz2")
+```
+
+Once the data has been downloaded, we can see the variables it contains:
+
+```{r, echo=TRUE, message=FALSE, warning=FALSE, cache=TRUE}
+names(StormData)
+```
+
+From these data we will select the ones that interest us:
+
+- `r names(StormData)[8]`
+- `r names(StormData)[23]`
+- `r names(StormData)[24]`
+- `r names(StormData)[25]`
+- `r names(StormData)[26]`
+- `r names(StormData)[27]`
+- `r names(StormData)[28]`
+
+Then we select the data associated with the damage to the health of the population and the greatest economic consequences, in the variables **DataMostHarmful** and **DataEconConseq** respectively. In addition we make lowercase the names of the variables.
+
+```{r, echo=TRUE, message=FALSE, warning=FALSE}
+library(dplyr)
+namesSD <- names(StormData)
+DataMostHarmful <- select(StormData,namesSD[c(8,23:24)])
+names(DataMostHarmful) <- tolower(names(DataMostHarmful))
+DataEconConseq <- select(StormData,namesSD[c(8,25:28)])
+names(DataEconConseq) <- tolower(names(DataEconConseq))
+```
+
+Then the data of **fatalities** and **injuries** are grouped and ordered according to the **type of event (evtype)**.
+
+```{r, echo=TRUE, message=FALSE, warning=FALSE, cache=FALSE}
+MostHarmful <- summarise(group_by(DataMostHarmful, evtype), fatalities = sum(fatalities, na.rm = TRUE), injuries = sum(injuries, na.rm = TRUE))
+MostHarmfulFat <- arrange(MostHarmful,desc(fatalities))
+MostHarmfulInj <- arrange(MostHarmful,desc(injuries))
+```
+
+
+For economic damage a similar action is taken, the data of **property damage (propdmg)** and **damage to crops (cropdmg)** are grouped and ordered according to the **type of event (evtype)**.
+In this case, you must first adjust the variables according to the orders of magnitude described in the variables ** propdmgexp ** and ** cropdmgexp **.
+
+
+```{r, echo=TRUE, message=FALSE, warning=FALSE, cache=FALSE}
+levels(DataEconConseq$propdmgexp)
+levels(DataEconConseq$cropdmgexp)
+```
+
+
+The alphabetic characters used to signify magnitude include "K" for thousands, "M" for millions and "B" for billions.
+For the rest of the symbols, the values indicated on the website [How to handle the exponent value of PROPDMGEXP and CROPDMGEXP](https://rstudio-pubs-stubs.s3.amazonaws.com/58957_37b6723ee52b455990e149edde45e5b6.html) are considered, delivers values for multipliers not mentioned in the official information.
+
+```{r, echo=TRUE, message=FALSE, warning=FALSE, cache=FALSE}
+valuesMult <- unique(c(levels(DataEconConseq$propdmgexp),levels(DataEconConseq$cropdmgexp)))
+Mult <- c(0,0,0,1,10,10,10,10,10,10,10,10,10,10^9,100,100,10^3,10^6,10^6,10^3)
+convert <- data.frame( valuesMult = valuesMult, Mult = Mult)
+tbl_df(convert)
+```
+
+This generates a variable ** convert** used to do the corresponding multiplication and thus group and order the data.
+
+```{r, echo=TRUE, message=FALSE, warning=FALSE, cache=FALSE}
+DataEconConseq$propdmgMult <- convert$Mult[match(DataEconConseq$propdmgexp, convert$valuesMult)]
+DataEconConseq$cropdmgMult <- convert$Mult[match(DataEconConseq$cropdmgexp, convert$valuesMult)]
+DataEconConseq$propdmgMult <- DataEconConseq$propdmgMult*DataEconConseq$propdmg
+DataEconConseq$cropdmgMult <- DataEconConseq$cropdmgMult*DataEconConseq$cropdmg
+
+EconConseq <- summarise(group_by(DataEconConseq, evtype), propdmg = sum(propdmgMult, na.rm = TRUE), cropdmg = sum(cropdmgMult, na.rm = TRUE))
+EconConseq <- mutate(EconConseq, total = propdmg + cropdmg)
+EconConseqProp <- arrange(EconConseq,desc(propdmg))
+EconConseqCrop <- arrange(EconConseq,desc(cropdmg))
+EconConseqTotal<- arrange(EconConseq,desc(total))
+```
+
+
+## Results
+###Damage to the health of the population.
+
+In the following table you can see that in the case of **fatalities** and **injuries**, the most significant events tend to repeat.
+
+```{r, echo=TRUE, message=FALSE, warning=FALSE, cache=FALSE}
+arrange(merge(head(MostHarmfulFat,10),head(MostHarmfulInj,10),all = TRUE),desc(fatalities),desc(injuries))
+```
+
+The top 10 events with the highest total **fatalities** and **injuries** are shown below.
+
+```{r, echo=TRUE, message=FALSE, warning=FALSE, cache=FALSE}
+library(ggplot2)
+library(gridExtra)
+library(grid)
+n <- 10
+p1 <- ggplot(data=head(MostHarmfulFat,n), aes(x=reorder(tolower(evtype), fatalities), y=fatalities)) +   geom_bar(fill="royalblue",stat="identity", width = 0.9)  + coord_flip() + 
+    ylab("Total number of fatalities") + xlab("Event type") +
+    theme(legend.position="none")
+
+p2 <- ggplot(data=head(MostHarmfulInj,n), aes(x=reorder(tolower(evtype), injuries), y=injuries)) +
+    geom_bar(fill="firebrick3",stat="identity") + coord_flip() +
+    ylab("Total number of injuries") + xlab("Event type") 
+grid.arrange(p1, p2, nrow = 2, top = "Health impact of weather events in the US - Top 10")
+```
+
+We can see that tornadoes are the main reason for injuries and deaths that affect the health of the population.
+
+###Greatest economic consequences.
+
+In the following table you can see that in the case of **property damage**, **crop damage** y **total damage**, the most significant events tend to repeat.
+*(total damage is property damage + crop damage)*
+
+```{r, echo=TRUE, message=FALSE, warning=FALSE, cache=FALSE}
+arrange(merge(head(EconConseqTotal,10),merge(head(EconConseqProp,10),head(EconConseqCrop,10), all = TRUE), all = TRUE),desc(total),desc(propdmg),desc(cropdmg))
+```
+
+The top 10 events with the highest total **property damage**, **crop damage** y **total damage** are shown below.
+
+```{r, echo=TRUE, message=FALSE, warning=FALSE, cache=FALSE}
+n <- 10
+p1 <- ggplot(data=head(EconConseqProp,n), aes(x=reorder(tolower(evtype), propdmg), y=propdmg/1000000)) +
+    geom_bar(fill="royalblue",stat="identity", width = 0.9)  + coord_flip() + 
+    ylab("Property damage (MUS$)") + xlab("Event type") +
+    theme(legend.position="none")
+p2 <- ggplot(data=head(EconConseqCrop,n), aes(x=reorder(tolower(evtype), cropdmg), y=cropdmg/1000000)) +
+    geom_bar(fill="firebrick3",stat="identity") + coord_flip() +
+    ylab("Crop damage (MUS$)") + xlab("Event type") + scale_y_continuous(limit = c(0,max(EconConseqTotal$total/1000000))) + theme(legend.position="none")
+p3 <- ggplot(data=head(EconConseqTotal,n), aes(x=reorder(tolower(evtype), total), y=total/1000000)) +
+    geom_bar(fill="darkolivegreen3",stat="identity") + coord_flip() +
+    ylab("Property + crop damage (MUS$)") + xlab("Event type") + scale_y_continuous(limit = c(0,max(EconConseqTotal$total/1000000))) + 
+    theme(legend.position="none")
+grid.arrange(p1, p2, p3, nrow = 3, top = "Economic Consequences of weather events in the US - Top 10")
+```
+
+We can see that floods, storm surges, hurricanes and tornadoes are the ones that contribute most to damage to property.  
+In the case of damage to crops, drought is the one that contributes the most to crop damage.  
+Globally, damage to crops is not significant compared to damage to property.  
+
