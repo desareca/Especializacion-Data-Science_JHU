@@ -1,0 +1,89 @@
+---
+title: "Regression Models Course Project"
+author: "Carlos Saquel"
+date: "December 06, 2018"
+output: pdf_document
+---
+# Executive Summary
+
+Motor Trend, an automobile trend magazine is interested in exploring the relationship between a set of variables and miles per gallon (MPG) outcome. In this project, we will analyze the mtcars dataset from the 1974 Motor Trend US magazine to answer the following questions:
+
+- Is an automatic or manual transmission better for miles per gallon (MPG)?
+
+- How different is the MPG between automatic and manual transmissions?
+
+
+#Data Description
+
+We analyze the **mtcars** data set through Regression Modelling and exploratory analysis to show how automatic (am = 0) and manual (am = 1) transmissions features affect the MPG feature.
+
+The data was extracted from the 1974 Motor Trend US magazine, which comprises fuel consumption and 10 aspects of automobile design and performance for 32 automobiles (1973-74 models).
+
+The data set consists of a data frame with 32 observations (nrow) and 11 variables (ncol).
+
+- **mpg**: Miles per US gallon
+- **cyl**: Number of cylinders
+- **disp**: Displacement (*cubic inches*)
+- **hp**: Gross horsepower
+- **drat**: Rear axle ratio
+- **wt**: Weight (1000 lb)
+- **qsec**: 1/4 mile time
+- **vs**: Engine (0 = *V-shaped*, 1 = *straight*)
+- **am**: Transmission (0 = *automatic*, 1 = *manual*)
+- **gear**: Number of forward gears
+- **carb**: Number of carburetors
+
+```{r load, echo = FALSE, message=FALSE, comment=""}
+library(ggplot2)
+library(dplyr)
+library(knitr)
+data(mtcars)
+```
+
+
+# Appendix
+
+## A.1 - Exploratory Data Analysis
+
+To begin the analysis we review the data taking a sample and seeing how it is structured (table 1, 2 and 3).
+
+```{r table1, echo = FALSE, message=FALSE, comment=""}
+data <- mtcars
+colnames(data) <- paste0("**",names(data),"**")
+rownames(data) <- paste0("**",rownames(data),"**")
+knitr::kable(head(data,6), align = "c", caption = "Sample of data set mtcars")
+```
+
+```{r plot1, echo = FALSE, message=FALSE, fig.cap="Plot mtcars variables"}
+pairs(mtcars)
+#library(GGally)
+#ggpairs(mtcars, aes(alpha = 0.4))
+```
+
+```{r table2, echo = FALSE, message=FALSE, comment=""}
+a<-list()
+for (i in 1:dim(mtcars)[2]){
+      a[i]<-class(mtcars[,i])
+}
+c<- data.frame(t(a))
+colnames(c) <- paste0("**",names(mtcars),"**")
+#rownames(c) <- "**class**"
+knitr::kable(c, align = "c", pading = 3, caption = "Class of the data set mtcars")
+```
+
+
+
+
+
+Vamos a ajustar algunas las variables xxxxxxxx que son numericas pero deberian ser tipo factor.
+
+```{r table3, echo = FALSE, message=FALSE, comment=""}
+mtcars$cyl <- factor(mtcars$cyl)
+mtcars$am <- factor(mtcars$am)
+mtcars$vs <- factor(mtcars$vs)
+mtcars$gear <- factor(mtcars$gear)
+mtcars$carb <- factor(mtcars$carb)
+
+knitr::kable(summary(mtcars[,1:5]), align = "c", caption = "Structure of the data set mtcars"); kable(summary(mtcars[,6:11]), align = "c", caption = "")
+```
+

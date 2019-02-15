@@ -1,0 +1,192 @@
+---
+title: "Regression Models Course Project"
+author: "crsd"
+date: "December 08, 2018"
+output:
+      html_document:
+            code_folding: hide
+            toc: true
+            toc_depth: 3
+            number_sections: false
+            theme: united
+            highlight: tango
+            css: air.css
+            keep_md: true
+            df_print: kable
+---
+# Executive Summary
+
+Motor Trend, an automobile trend magazine is interested in exploring the relationship between a set of variables and miles per gallon (MPG) outcome. In this project, we will analyze the mtcars dataset from the 1974 Motor Trend US magazine to answer the following questions:
+
+- Is an automatic or manual transmission better for miles per gallon (MPG)?
+
+- How different is the MPG between automatic and manual transmissions?
+
+
+#Data Description
+
+We analyze the **mtcars** data set through Regression Modelling and exploratory analysis to show how automatic (*am* = 0) and manual (*am* = 1) transmissions features affect the MPG feature.
+
+The data was extracted from the 1974 Motor Trend US magazine, which comprises fuel consumption and 10 aspects of automobile design and performance for 32 automobiles (1973-74 models).
+
+The data set consists of a data frame with 32 observations (nrow) and 11 variables (ncol).
+
+- **mpg**: Miles per US gallon
+- **cyl**: Number of cylinders
+- **disp**: Displacement (*cubic inches*)
+- **hp**: Gross horsepower
+- **drat**: Rear axle ratio
+- **wt**: Weight (1000 lb)
+- **qsec**: 1/4 mile time
+- **vs**: Engine (0 = *V-shaped*, 1 = *straight*)
+- **am**: Transmission (0 = *automatic*, 1 = *manual*)
+- **gear**: Number of forward gears
+- **carb**: Number of carburetors
+
+```{r load, echo = FALSE, message=FALSE, comment=""}
+library(ggplot2); library(dplyr); library(knitr); library(MASS); data(mtcars)
+data <- mtcars
+```
+
+```{r table3, echo = FALSE, eval=FALSE, message=FALSE, comment=""}
+mtcars$cyl <- factor(mtcars$cyl)
+mtcars$am <- factor(mtcars$am,labels=c("Automatic","Manual"))
+mtcars$vs <- factor(mtcars$vs,labels=c("V-shaped","straight"))
+mtcars$gear <- factor(mtcars$gear); mtcars$carb <- factor(mtcars$carb)
+```
+
+```{r table1, echo = FALSE, eval=FALSE, message=FALSE, comment=""}
+knitr::kable(head(data,5), align = "c", caption = "Sample of data set mtcars"); 
+a<-list();for (i in 1:dim(data)[2]){a[i]<-class(data[,i])}
+knitr::kable(data.frame(t(a)), align = "c", pading = 3, 
+             caption = "Class of the data set mtcars")
+```
+
+
+```{r plot1, eval=FALSE, echo=FALSE, message=FALSE, fig.align='center'}
+p <- ggplot(mtcars, aes(x=factor(am,labels=c("Automatic","Manual")), y=mpg, 
+      fill = factor(am,labels=c("Automatic","Manual")))) + geom_boxplot() +
+      geom_dotplot(binaxis='y', stackdir='center', dotsize=1, fill ="black") +
+      scale_fill_discrete(name = "Transmission") + xlab("Transmission") + 
+      ylab("Miles per US gallon") + labs(caption = 
+      "Figure 1: Miles per US gallon v/s Transmission (Automatic/Manual)");p
+```
+
+
+# Exploratory Data Analysis
+
+First we must determine whether or not there really is a difference between automatic and manual transmissions in terms of mpg. For this purpose, a review of the data is made (see *Appendix A.1*)
+
+In the **Figure1** in *Appendix A.1* the boxplot with the information of the mileage vs the transmission is shown. In this diagram you can clearly see that there is a difference in the mileage (*mpg*) depending on the type of transmission (automatic or manual). Where the median mileage (*mpg*) for an automatic transmission is `17.3` and for a manual transmission is `22.8`.
+
+
+# Multivariable Regression Model
+
+For the analysis we will consider 3 models (see *Appendix A.2*).
+
+- **fit_base**: Regression model between `mpg` and` am`.
+
+- **fit_best**: Regression model between `mpg` the variables determined by the` stepAIC` function.
+
+- **fit_full**: Regression model between `mpg` and all the data set variables.
+
+
+Once the `fit_best` model has been obtained (*mpg ~ cyl + hp + wt + am*) we will use the` anova` function to determine which of these three models best fits the data with the least possible complexity.
+
+```{r fit 0, message=FALSE, include=FALSE}
+fit_base <- lm(mpg ~ am, data = mtcars)
+fit_full <- lm(mpg ~ ., data = mtcars)
+fit_best <- stepAIC(fit_full, direction = "both")
+```
+
+```{r anova, message=FALSE, include=FALSE}
+anova(fit_base, fit_best)
+```
+
+According to the analysis of variance (ver *Apendix A.2*) the p-value is significant, hence we reject the null hypothesis that the variables *cyl*, *hp* and *wt* do not contribute to the accuracy of the model.
+We double-check the residuals for non-normality (*Apendix A.2 - Figure 2*) and can see they are all normally distributed and homoskedastic.
+
+
+```{r fit 0a,echo=TRUE, message=FALSE, eval=TRUE}
+d<-data.frame()
+d[1,1] <- round(summary(fit_base)$r.squared,4); d[1,2] <- round(summary(fit_best)$r.squared,4)
+colnames(d) <- c("fit_base", "fit_best"); rownames(d) <- "R^2^"
+knitr::kable(d, align = "c", pading = 3, caption = "Comparacion R^2^ entre modelos")
+```
+
+The model `fit_best` explains 84.96% of the variance and as a result, *cyl*, *hp*, *wt*  did affect the correlation between *mpg* and *am*. Thus, we can say the difference between automatic and manual transmissions is 1.81 MPG.
+
+
+# Conclusions
+
+Based on the observations of our best fit model, we can conclude:
+
+Considering the summaries of the models, it is observed that the model *fit_best* has a significant difference in the parameters with *fit_base*. For *fit_base*, cars with manual transmission get more miles per gallon compared to automobiles with automatic transmission. (7.25 *mpg* set by *hp*, *cyl*, and *wt*), in the case of *fit_best* is 1.81 in the same conditions.
+
+The *mpg* will decrease by 2.5 (adjusted by *hp*, *cyl* and *am*) for every 1000 pounds of weight. *mpg* decreases negligibly with the increase of *hp*.
+
+If the number of cylinders, *cil* increases from 4 to 6 and 8, *mpg* will decrease by a factor of 3 and 2.2 respectively (set by *hp*, *wt* and *am*).
+
+
+# Appendix
+
+## A.1 - Data Processing
+
+First we load the data and the libraries.
+
+```{r dProc0, ref.label='load', echo = TRUE, eval=TRUE, message=FALSE, comment=""}
+```
+
+
+Then we start with the analysis, review the data taking a sample and see how it is structured (table 2, 3).
+
+```{r dProc1, ref.label='table1', echo = TRUE, eval=TRUE, message=FALSE, comment=""}
+```
+
+```{r dProc2, ref.label='table2', echo = TRUE, eval=TRUE, message=FALSE, comment=""}
+```
+
+
+Observing the data, let's adjust the variables **cyl**, **hp**, **am**, **gear** and **carb** which are numeric but should be factor type.
+
+```{r dProc3, ref.label='table3', echo = TRUE, eval=TRUE, message=FALSE, comment=""}
+```
+
+With this we can compare how the type of transmission (automatic - manual) affects the mileage (*mpg*).
+
+```{r dProc4, eval=TRUE, echo=TRUE, message=FALSE, comment="", ref.label='plot1'}
+```
+
+
+## A.2 - Multivariable Regression Model and inferences.
+**Next, 3 linear models are generated:**
+
+```{r fit 1,echo=TRUE, message=FALSE, eval=TRUE, comment=""}
+fit_base <- lm(mpg ~ am, data = mtcars)
+fit_full <- lm(mpg ~ ., data = mtcars)
+fit_best <- stepAIC(fit_full, direction = "both")
+```
+
+
+**Analysis of variance of the models.**
+
+
+```{r fit 2,echo=TRUE, message=FALSE, eval=TRUE, comment=""}
+anova(fit_base, fit_best)
+```
+
+**Summary *fit_base* and *fit_best*.**
+```{r fit 3,echo=TRUE, message=FALSE, eval=TRUE, comment=""}
+summary(fit_base)
+summary(fit_best)
+```
+
+**Check residuals**
+
+```{r plot 3,echo=TRUE, message=FALSE, eval=TRUE}
+par(mfrow=c(2,2), oma=c(2,0,0,0))
+plot(fit_best)
+mtext(side=1,line=0,cex=1, outer=T,"Figure 2: Check residuals")
+```
+
+
