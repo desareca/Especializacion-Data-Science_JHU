@@ -4,3 +4,7 @@ You work for Motor Trend, a magazine about the automobile industry. Looking at a
 
 - “Is an automatic or manual transmission better for MPG”
 - "Quantify the MPG difference between automatic and manual transmissions"
+
+## Report
+
+This report is in https://rpubs.com/desareca/Regression_Models
